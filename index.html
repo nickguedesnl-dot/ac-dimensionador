@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArcThermal — Dimensionador de Ar-Condicionado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0b0d;
+  --surface: #111318;
+  --surface2: #181c23;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #eef0f4;
+  --muted: #7a8295;
+  --accent: #00d4a8;
+  --accent2: #0090ff;
+  --warn: #f5a623;
+  --danger: #ff4d4d;
+  --success: #00d4a8;
+  --mono: 'DM Mono', monospace;
+  --display: 'Syne', sans-serif;
+  --body: 'DM Sans', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.6;overflow-x:hidden}
+
+/* ── NOISE OVERLAY ── */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");background-size:200px;z-index:9999}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:60px;background:rgba(10,11,13,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.nav-logo{font-family:var(--display);font-size:18px;font-weight:800;letter-spacing:-0.5px;color:var(--text)}
+.nav-logo span{color:var(--accent)}
+.nav-tabs{display:flex;gap:2px}
+.nav-tab{padding:6px 16px;font-size:13px;font-family:var(--mono);color:var(--muted);background:none;border:none;cursor:pointer;border-radius:6px;transition:all .2s;letter-spacing:0.02em}
+.nav-tab:hover{color:var(--text);background:rgba(255,255,255,0.05)}
+.nav-tab.active{color:var(--accent);background:rgba(0,212,168,0.08)}
+.nav-tag{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border2);padding:3px 10px;border-radius:100px}
+
+/* ── HERO ── */
+.hero{padding:120px 2.5rem 60px;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center}
+.hero-title{font-family:var(--display);font-size:clamp(36px,5vw,64px);font-weight:800;line-height:1.05;letter-spacing:-2px}
+.hero-title em{font-style:normal;color:var(--accent)}
+.hero-sub{margin-top:1.2rem;font-size:15px;color:var(--muted);line-height:1.7;max-width:480px}
+.hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-top:2.5rem;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.hero-stat{background:var(--surface);padding:1rem 1.2rem}
+.hero-stat-val{font-family:var(--display);font-size:26px;font-weight:700;color:var(--text)}
+.hero-stat-val span{font-size:14px;color:var(--muted);font-weight:400}
+.hero-stat-label{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px;letter-spacing:0.04em}
+.hero-chart{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;position:relative;overflow:hidden}
+.hero-chart::before{content:'CARGA POR CÔMODO';position:absolute;top:1rem;left:1.5rem;font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:0.1em}
+#heroChart{margin-top:1.5rem}
+
+/* ── SECTION ── */
+.section{padding:3rem 2.5rem;max-width:1200px;margin:0 auto;display:none}
+.section.active{display:block}
+.section-header{display:flex;align-items:center;gap:1rem;margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.section-num{font-family:var(--mono);font-size:11px;color:var(--accent);background:rgba(0,212,168,0.1);border:1px solid rgba(0,212,168,0.2);padding:3px 10px;border-radius:100px;letter-spacing:0.08em}
+.section-title{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.5px}
+
+/* ── GRID LAYOUTS ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem}
+.card-title{font-family:var(--mono);font-size:11px;letter-spacing:0.08em;color:var(--muted);margin-bottom:1rem;text-transform:uppercase}
+
+/* ── METRIC CARD ── */
+.metric{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem}
+.metric-label{font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:0.05em;margin-bottom:4px}
+.metric-val{font-family:var(--display);font-size:26px;font-weight:700;color:var(--text);line-height:1}
+.metric-unit{font-size:12px;color:var(--muted);margin-top:3px}
+.metric.accent{border-color:rgba(0,212,168,0.25);background:rgba(0,212,168,0.05)}
+.metric.accent .metric-val{color:var(--accent)}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:0.08em;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface2)}
+td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.td-num{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.td-bold{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:500}
+.td-total td{background:rgba(0,212,168,0.05);border-top:1px solid rgba(0,212,168,0.2)}
+.td-total .td-bold{font-size:13px}
+
+/* ── BADGE ── */
+.badge{display:inline-block;font-size:10px;font-family:var(--mono);padding:3px 10px;border-radius:100px;letter-spacing:0.04em}
+.badge-ok{background:rgba(0,212,168,0.12);color:var(--accent);border:1px solid rgba(0,212,168,0.25)}
+.badge-warn{background:rgba(245,166,35,0.12);color:var(--warn);border:1px solid rgba(245,166,35,0.25)}
+.badge-blue{background:rgba(0,144,255,0.12);color:var(--accent2);border:1px solid rgba(0,144,255,0.25)}
+
+/* ── INPUTS ── */
+.input-group{margin-bottom:1rem}
+.input-group label{display:block;font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:0.05em;margin-bottom:6px}
+input[type=number],select{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-size:13px;font-family:var(--mono);color:var(--text);outline:none;transition:border-color .2s}
+input[type=number]:focus,select:focus{border-color:var(--accent)}
+select option{background:var(--surface2)}
+.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+
+/* ── FORMULA BOX ── */
+.formula{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--muted);margin:6px 0;letter-spacing:0.02em}
+.formula strong{color:var(--accent)}
+
+/* ── BUTTONS ── */
+.btn{padding:10px 22px;font-size:13px;font-family:var(--mono);border-radius:8px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text);transition:all .2s;letter-spacing:0.03em}
+.btn:hover{background:rgba(255,255,255,0.05);border-color:var(--border2)}
+.btn-accent{background:var(--accent);color:#000;border-color:var(--accent);font-weight:500}
+.btn-accent:hover{opacity:.88;background:var(--accent)}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:1.5rem}
+
+/* ── MEMORY ── */
+.memory-block{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1.5rem;font-size:13px;line-height:1.9;color:var(--text)}
+.memory-block h4{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;color:var(--accent);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:10px;margin-top:16px}
+.memory-block h4:first-child{margin-top:0}
+.memory-block .mval{font-family:var(--mono);color:var(--accent)}
+
+/* ── PROGRESS BAR ── */
+.bar-wrap{margin:6px 0}
+.bar-label{display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:3px}
+.bar-track{background:var(--surface2);border-radius:100px;height:5px;overflow:hidden}
+.bar-fill{height:100%;border-radius:100px;background:var(--accent);transition:width .6s cubic-bezier(.4,0,.2,1)}
+.bar-fill.blue{background:var(--accent2)}
+.bar-fill.warn{background:var(--warn)}
+
+/* ── CONCEPT BOX ── */
+.concept{border:1px solid rgba(0,212,168,0.2);border-radius:12px;padding:1.5rem;background:rgba(0,212,168,0.04)}
+.concept-icon{font-size:28px;margin-bottom:8px}
+.concept-title{font-family:var(--display);font-size:16px;font-weight:700;margin-bottom:6px}
+.concept-text{font-size:13px;color:var(--muted);line-height:1.7}
+
+/* ── SEPARATOR ── */
+.sep{height:1px;background:var(--border);margin:1.5rem 0}
+
+/* ── FOOTER ── */
+footer{margin-top:4rem;border-top:1px solid var(--border);padding:2rem 2.5rem;display:flex;justify-content:space-between;align-items:center;max-width:1200px;margin-left:auto;margin-right:auto}
+footer p{font-size:12px;font-family:var(--mono);color:var(--muted)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:100px}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.section.active>*{animation:fadeUp .35s ease both}
+.section.active>*:nth-child(2){animation-delay:.05s}
+.section.active>*:nth-child(3){animation-delay:.1s}
+.section.active>*:nth-child(4){animation-delay:.15s}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;gap:2rem}
+  .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+  .input-grid{grid-template-columns:1fr}
+  nav{padding:0 1rem}
+  .nav-tabs .nav-tab{padding:6px 10px;font-size:12px}
+  .hero{padding:90px 1rem 2rem}
+  .section{padding:2rem 1rem}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Arc<span>Thermal</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('home',this)">Visão geral</button>
+    <button class="nav-tab" onclick="showSection('dados',this)">Cômodos</button>
+    <button class="nav-tab" onclick="showSection('calculo',this)">Carga térmica</button>
+    <button class="nav-tab" onclick="showSection('equip',this)">Equipamentos</button>
+    <button class="nav-tab" onclick="showSection('custos',this)">CAPEX / OPEX</button>
+    <button class="nav-tab" onclick="showSection('memoria',this)">Memória</button>
+  </div>
+  <div class="nav-tag">A3 · 2026-1</div>
+</nav>
+
+<!-- HOME -->
+<div id="sec-home" class="section active" style="padding-top:0">
+  <div class="hero">
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:0.1em;margin-bottom:1rem">UC — REFRIGERAÇÃO E AR-CONDICIONADO</div>
+      <h1 class="hero-title">Dimensionador<br>de <em>sistema</em><br>de A/C</h1>
+      <p class="hero-sub">Ferramenta de cálculo de carga térmica e dimensionamento de equipamentos para a edificação de 814 m² com 13 cômodos, conforme Edital A3 2026-1.</p>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-val" id="hs-area">—<span> m²</span></div>
+          <div class="hero-stat-label">ÁREA CLIMATIZADA</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-val" id="hs-qtr">—<span> TR</span></div>
+          <div class="hero-stat-label">CARGA TOTAL</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-val" id="hs-capex">—</div>
+          <div class="hero-stat-label">CAPEX EST. (R$)</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-val" id="hs-opex">—</div>
+          <div class="hero-stat-label">OPEX/ANO (R$)</div>
+        </div>
+      </div>
+      <div class="btn-group" style="margin-top:2rem">
+        <button class="btn btn-accent" onclick="showSection('calculo',document.querySelectorAll('.nav-tab')[2])">Calcular agora →</button>
+        <button class="btn" onclick="showSection('memoria',document.querySelectorAll('.nav-tab')[5])">Ver memória</button>
+      </div>
+    </div>
+    <div class="hero-chart">
+      <div style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:0.1em;margin-bottom:1rem">CARGA POR CÔMODO (BTU/h)</div>
+      <div style="position:relative;height:320px"><canvas id="heroChart"></canvas></div>
+    </div>
+  </div>
+
+  <div style="max-width:1200px;margin:0 auto;padding:0 2.5rem 4rem">
+    <div class="grid-3">
+      <div class="concept">
+        <div class="concept-icon">⚡</div>
+        <div class="concept-title">Menor CAPEX</div>
+        <div class="concept-text">Sistema split individualizado multi-split. Menor investimento inicial com flexibilidade de agrupamento por cômodos adjacentes.</div>
+      </div>
+      <div class="concept">
+        <div class="concept-icon">💰</div>
+        <div class="concept-title">Menor OPEX</div>
+        <div class="concept-text">Equipamentos com EER ≥ 11 BTU/Wh. Operação seletiva por ambiente reduz consumo em horários de baixa ocupação.</div>
+      </div>
+      <div class="concept">
+        <div class="concept-icon">🌡️</div>
+        <div class="concept-title">NBR 16401</div>
+        <div class="concept-text">Cálculo conforme norma brasileira. Temperatura interna entre 19°C e 26°C. Parâmetros ajustáveis para cidade e uso.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DADOS -->
+<div id="sec-dados" class="section">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <h2 class="section-title">Cômodos a climatizar</h2>
+  </div>
+  <div class="grid-4" style="margin-bottom:1.5rem">
+    <div class="metric accent"><div class="metric-label">CÔMODOS</div><div class="metric-val">13</div></div>
+    <div class="metric"><div class="metric-label">ÁREA TOTAL (m²)</div><div class="metric-val" id="d-area">—</div></div>
+    <div class="metric"><div class="metric-label">VOLUME (m³)</div><div class="metric-val" id="d-vol">—</div></div>
+    <div class="metric"><div class="metric-label">PESSOAS TOTAIS</div><div class="metric-val" id="d-pessoas">—</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>CÔMODO</th><th>ÁREA (m²)</th><th>PÉ DIREITO (m)</th><th>VOLUME (m³)</th><th>PESSOAS</th><th>USO</th>
+      </tr></thead>
+      <tbody id="dados-tbody"></tbody>
+    </table>
+  </div>
+  <p style="font-size:12px;font-family:var(--mono);color:var(--muted);margin-top:1rem">* Banheiros WC masculino e WC feminino excluídos conforme requisito do projeto. Pé-direito: 2,5 m. Forro: laje de concreto armado.</p>
+</div>
+
+<!-- CÁLCULO -->
+<div id="sec-calculo" class="section">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <h2 class="section-title">Cálculo de carga térmica</h2>
+  </div>
+  <div class="grid-2" style="margin-bottom:1.5rem">
+    <div class="card">
+      <div class="card-title">Parâmetros de projeto</div>
+      <div class="input-grid">
+        <div class="input-group"><label>TEMP. EXTERNA (°C)</label><input type="number" id="p_text" value="34" step="0.5" onchange="calcAll()"></div>
+        <div class="input-group"><label>TEMP. INTERNA MÁX. (°C)</label><input type="number" id="p_tint" value="24" step="0.5" onchange="calcAll()"></div>
+        <div class="input-group"><label>IRRADIAÇÃO SOLAR (W/m²)</label><input type="number" id="p_solar" value="200" onchange="calcAll()"></div>
+        <div class="input-group"><label>U — PAREDE (W/m²K)</label><input type="number" id="p_upar" value="2.0" step="0.1" onchange="calcAll()"></div>
+        <div class="input-group"><label>U — COBERTURA (W/m²K)</label><input type="number" id="p_ucob" value="3.5" step="0.1" onchange="calcAll()"></div>
+        <div class="input-group"><label>CALOR/PESSOA (W)</label><input type="number" id="p_pessoa" value="100" onchange="calcAll()"></div>
+        <div class="input-group"><label>ILUMINAÇÃO (W/m²)</label><input type="number" id="p_ilum" value="12" onchange="calcAll()"></div>
+        <div class="input-group"><label>EQUIPAMENTOS (W/m²)</label><input type="number" id="p_equip" value="15" onchange="calcAll()"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Metodologia — ASHRAE simplificado / NBR 16401</div>
+      <div class="formula"><strong>Q_total</strong> = Q_env + Q_sol + Q_pess + Q_ilum + Q_equip</div>
+      <div class="formula"><strong>Q_env</strong> = U_par × A_env × ΔT</div>
+      <div class="formula"><strong>Q_sol</strong> = α × I_solar × A_cob &nbsp;(α = 0,8)</div>
+      <div class="formula"><strong>Q_pess</strong> = n × q_pessoa</div>
+      <div class="formula"><strong>Q_ilum</strong> = q_ilum × A</div>
+      <div class="formula"><strong>Q_equip</strong> = q_equip × A</div>
+      <div class="sep"></div>
+      <div class="formula"><strong>1 TR</strong> = 3.517 W &nbsp;|&nbsp; <strong>1 W</strong> = 3,412 BTU/h</div>
+      <p style="font-size:12px;font-family:var(--mono);color:var(--muted);margin-top:1rem;line-height:1.7">A_env estimada como perímetro × pé-direito (2,5 m). Perímetro = 2×(√A×1.3 + √A×0.77). Margem de segurança de 10% aplicada na seleção de equipamentos.</p>
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:1.5rem">
+    <div class="metric accent"><div class="metric-label">CARGA TOTAL (W)</div><div class="metric-val" id="c-w">—</div></div>
+    <div class="metric"><div class="metric-label">CARGA TOTAL (BTU/h)</div><div class="metric-val" id="c-btu">—</div></div>
+    <div class="metric"><div class="metric-label">CARGA TOTAL (TR)</div><div class="metric-val" id="c-tr">—</div></div>
+    <div class="metric"><div class="metric-label">DENSIDADE MÉDIA (W/m²)</div><div class="metric-val" id="c-dens">—</div></div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>CÔMODO</th><th>Q_env (W)</th><th>Q_sol (W)</th><th>Q_pess (W)</th><th>Q_ilum (W)</th><th>Q_equip (W)</th><th>Q_total (W)</th><th>BTU/h</th><th>TR</th>
+      </tr></thead>
+      <tbody id="calc-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-top:1.5rem">
+    <div class="card-title">Distribuição da carga por componente</div>
+    <div id="barra-comp"></div>
+  </div>
+</div>
+
+<!-- EQUIPAMENTOS -->
+<div id="sec-equip" class="section">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <h2 class="section-title">Seleção de equipamentos</h2>
+  </div>
+  <div class="grid-3" style="margin-bottom:1.5rem">
+    <div class="metric accent"><div class="metric-label">EVAPORADORAS</div><div class="metric-val" id="e-evap">—</div></div>
+    <div class="metric"><div class="metric-label">CONDENSADORAS</div><div class="metric-val" id="e-cond">—</div></div>
+    <div class="metric"><div class="metric-label">CAPACIDADE TOTAL (BTU/h)</div><div class="metric-val" id="e-cap">—</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>CÔMODO</th><th>CARGA (BTU/h)</th><th>+10% MARGEM</th><th>MODELO SUGERIDO</th><th>CAP. NOMINAL (BTU/h)</th><th>TIPO</th><th>STATUS</th>
+      </tr></thead>
+      <tbody id="equip-tbody"></tbody>
+    </table>
+  </div>
+  <div class="grid-2" style="margin-top:1.5rem">
+    <div class="card">
+      <div class="card-title">Conceito do sistema adotado</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.8">Sistema <span style="color:var(--text);font-weight:500">split multi-split individualizado</span>: cada unidade condensadora externa alimenta 1 a 2 evaporadoras de cômodos próximos, reduzindo o CAPEX e simplificando a instalação. Cômodos de alta carga (salas de aula, laboratórios) recebem evaporadoras dedicadas do tipo cassete ou piso-teto para melhor distribuição do ar.</p>
+      <div class="sep"></div>
+      <p style="font-size:12px;font-family:var(--mono);color:var(--muted)">Refrigerante recomendado: R-32 (menor GWP) ou R-410A. Tubulações em cobre com isolamento térmico. Drenagem por gravidade ou bomba.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Distribuição por tipo de evaporadora</div>
+      <div id="tipo-chart" style="position:relative;height:220px"><canvas id="tipoCanvas"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOS -->
+<div id="sec-custos" class="section">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <h2 class="section-title">CAPEX e OPEX</h2>
+  </div>
+  <div class="grid-2" style="margin-bottom:1.5rem">
+    <div class="card">
+      <div class="card-title">Parâmetros — CAPEX</div>
+      <div class="input-grid">
+        <div class="input-group"><label>CUSTO EVAP. (R$/BTU/h)</label><input type="number" id="k_evap" value="0.35" step="0.05" onchange="calcCustos()"></div>
+        <div class="input-group"><label>CUSTO COND. (R$/BTU/h)</label><input type="number" id="k_cond" value="0.40" step="0.05" onchange="calcCustos()"></div>
+        <div class="input-group"><label>INSTALAÇÃO / M.O. (%)</label><input type="number" id="k_inst" value="30" step="5" onchange="calcCustos()"></div>
+        <div class="input-group"><label>TUBULAÇÃO E MATERIAIS (%)</label><input type="number" id="k_mat" value="10" step="5" onchange="calcCustos()"></div>
+      </div>
+      <div class="sep"></div>
+      <div id="capex-break"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Parâmetros — OPEX</div>
+      <div class="input-grid">
+        <div class="input-group"><label>TARIFA ENERGIA (R$/kWh)</label><input type="number" id="k_tarifa" value="0.75" step="0.05" onchange="calcCustos()"></div>
+        <div class="input-group"><label>HORAS OPERAÇÃO/DIA</label><input type="number" id="k_horas" value="10" step="0.5" onchange="calcCustos()"></div>
+        <div class="input-group"><label>DIAS OPERAÇÃO/ANO</label><input type="number" id="k_dias" value="250" onchange="calcCustos()"></div>
+        <div class="input-group"><label>EER MÉDIO (BTU/Wh)</label><input type="number" id="k_eer" value="11" step="0.5" onchange="calcCustos()"></div>
+        <div class="input-group"><label>MANUTENÇÃO ANUAL (% CAPEX)</label><input type="number" id="k_manut" value="3" step="0.5" onchange="calcCustos()"></div>
+        <div class="input-group"><label>HORIZONTE ANÁLISE (anos)</label><input type="number" id="k_anos" value="10" onchange="calcCustos()"></div>
+      </div>
+      <div class="sep"></div>
+      <div id="opex-break"></div>
+    </div>
+  </div>
+  <div class="grid-4" style="margin-bottom:1.5rem">
+    <div class="metric accent"><div class="metric-label">CAPEX TOTAL (R$)</div><div class="metric-val" id="cu-capex">—</div></div>
+    <div class="metric"><div class="metric-label">OPEX ANUAL (R$)</div><div class="metric-val" id="cu-opex">—</div></div>
+    <div class="metric"><div class="metric-label">CONSUMO ANUAL (kWh)</div><div class="metric-val" id="cu-kwh">—</div></div>
+    <div class="metric"><div class="metric-label">CUSTO TOTAL (R$)</div><div class="metric-val" id="cu-total">—</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Curva de custo acumulado (CAPEX + OPEX × anos)</div>
+    <div style="position:relative;height:260px"><canvas id="custoChart"></canvas></div>
+  </div>
+</div>
+
+<!-- MEMÓRIA -->
+<div id="sec-memoria" class="section">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <h2 class="section-title">Memória de cálculo</h2>
+  </div>
+  <div class="memory-block" id="memoria-out"></div>
+  <div class="btn-group">
+    <button class="btn btn-accent" onclick="exportMemoria()">Copiar memória</button>
+    <button class="btn" onclick="window.print()">Imprimir / PDF</button>
+  </div>
+</div>
+
+<footer>
+  <p>ArcThermal · UC Refrigeração e Ar-Condicionado · A3 2026-1</p>
+  <p>Método: ASHRAE Simplified / NBR 16401</p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const COMODOS = [
+  { nome: 'Hall 1 / Recepção',     area: 124.6, pessoas: 80,  uso: 'Recepção'   },
+  { nome: 'Direção',               area:  38.9, pessoas: 15,  uso: 'Escritório' },
+  { nome: 'Sala dos Professores',  area:  21.3, pessoas: 15,  uso: 'Escritório' },
+  { nome: 'Sala de Aula 1',        area:  27.7, pessoas: 42,  uso: 'Sala de aula' },
+  { nome: 'Sala de Aula 2',        area:  43.2, pessoas: 42,  uso: 'Sala de aula' },
+  { nome: 'Sala de Aula 3',        area:  43.2, pessoas: 42,  uso: 'Sala de aula' },
+  { nome: 'Sala de Aula 4',        area:  41.3, pessoas: 42,  uso: 'Sala de aula' },
+  { nome: 'Sala de Aula 5',        area:  41.3, pessoas: 42,  uso: 'Sala de aula' },
+  { nome: 'Salas de Estudo 1–4',   area:  28.4, pessoas: 24,  uso: 'Estudo'     },
+  { nome: 'Sala de Reunião',       area:  12.3, pessoas: 12,  uso: 'Reunião'    },
+  { nome: 'Laboratório 1',         area:  41.3, pessoas: 44,  uso: 'Laboratório'},
+  { nome: 'Laboratório 2',         area:  41.3, pessoas: 44,  uso: 'Laboratório'},
+  { nome: 'Biblioteca',            area:  41.3, pessoas: 25,  uso: 'Biblioteca' },
+];
+const PD = 2.5;
+
+function gv(id){ return parseFloat(document.getElementById(id).value)||0; }
+function fmt(n,d=0){ return n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+
+function equipSugerido(btu){
+  const tiers = [
+    {cap:9000,  tipo:'Split hi-wall 9.000'},
+    {cap:12000, tipo:'Split hi-wall 12.000'},
+    {cap:18000, tipo:'Split hi-wall 18.000'},
+    {cap:24000, tipo:'Split piso-teto 24.000'},
+    {cap:30000, tipo:'Split piso-teto 30.000'},
+    {cap:36000, tipo:'Split cassete 36.000'},
+    {cap:48000, tipo:'Split cassete 48.000'},
+    {cap:60000, tipo:'Split cassete 60.000'},
+  ];
+  for(const t of tiers) if(btu<=t.cap) return t;
+  return {cap: Math.ceil(btu/12000)*12000, tipo:'Fancoil / VRF'};
+}
+
+let _res=[], _totalW=0, _totalCap=0, _capex=0, _opex=0, _kwh=0;
+let heroChartInst=null, tipoChartInst=null, custoChartInst=null;
+
+function calcAll(){
+  const tExt=gv('p_text'), tInt=gv('p_tint'), dT=tExt-tInt;
+  const solar=gv('p_solar'), uPar=gv('p_upar'), uCob=gv('p_ucob');
+  const qP=gv('p_pessoa'), qIl=gv('p_ilum'), qEq=gv('p_equip');
+
+  let totW=0, totArea=0, totPess=0;
+  _res = COMODOS.map(c=>{
+    const lado = Math.sqrt(c.area);
+    const perim = 2*(lado*1.3 + lado*0.77);
+    const aEnv = perim*PD;
+    const qEnv = uPar*aEnv*dT;
+    const qSol = 0.8*solar*c.area;
+    const qPess = c.pessoas*qP;
+    const qIlum = qIl*c.area;
+    const qEquip = qEq*c.area;
+    const qTot = qEnv+qSol+qPess+qIlum+qEquip;
+    totW+=qTot; totArea+=c.area; totPess+=c.pessoas;
+    return {...c, aEnv, qEnv, qSol, qPess, qIlum, qEquip, qTot,
+            btu: qTot*3.412, tr: qTot/3517};
+  });
+  _totalW=totW;
+  const totBtu=totW*3.412;
+
+  // hero stats
+  document.getElementById('hs-area').innerHTML=fmt(totArea,1)+'<span> m²</span>';
+  document.getElementById('hs-qtr').innerHTML=fmt(totW/3517,1)+'<span> TR</span>';
+
+  // dados tab
+  document.getElementById('d-area').textContent=fmt(totArea,1);
+  document.getElementById('d-vol').textContent=fmt(totArea*PD,0);
+  document.getElementById('d-pessoas').textContent=totPess;
+  document.getElementById('dados-tbody').innerHTML = COMODOS.map((c,i)=>`
+    <tr>
+      <td class="td-num">${String(i+1).padStart(2,'0')}</td>
+      <td>${c.nome}</td>
+      <td class="td-num">${c.area}</td>
+      <td class="td-num">${PD}</td>
+      <td class="td-num">${fmt(c.area*PD,1)}</td>
+      <td class="td-num">${c.pessoas}</td>
+      <td><span class="badge badge-blue">${c.uso}</span></td>
+    </tr>`).join('');
+
+  // calc tab
+  document.getElementById('c-w').textContent=fmt(totW,0);
+  document.getElementById('c-btu').textContent=fmt(totBtu,0);
+  document.getElementById('c-tr').textContent=fmt(totW/3517,1);
+  document.getElementById('c-dens').textContent=fmt(totW/totArea,1);
+
+  document.getElementById('calc-tbody').innerHTML = _res.map(r=>`
+    <tr>
+      <td>${r.nome}</td>
+      <td class="td-num">${fmt(r.qEnv,0)}</td>
+      <td class="td-num">${fmt(r.qSol,0)}</td>
+      <td class="td-num">${fmt(r.qPess,0)}</td>
+      <td class="td-num">${fmt(r.qIlum,0)}</td>
+      <td class="td-num">${fmt(r.qEquip,0)}</td>
+      <td class="td-bold">${fmt(r.qTot,0)}</td>
+      <td class="td-num">${fmt(r.btu,0)}</td>
+      <td class="td-num">${r.tr.toFixed(2)}</td>
+    </tr>`).join('')
+  + `<tr class="td-total">
+      <td style="font-weight:500">TOTAL</td>
+      <td class="td-num">${fmt(_res.reduce((s,r)=>s+r.qEnv,0),0)}</td>
+      <td class="td-num">${fmt(_res.reduce((s,r)=>s+r.qSol,0),0)}</td>
+      <td class="td-num">${fmt(_res.reduce((s,r)=>s+r.qPess,0),0)}</td>
+      <td class="td-num">${fmt(_res.reduce((s,r)=>s+r.qIlum,0),0)}</td>
+      <td class="td-num">${fmt(_res.reduce((s,r)=>s+r.qEquip,0),0)}</td>
+      <td class="td-bold">${fmt(totW,0)}</td>
+      <td class="td-bold">${fmt(totBtu,0)}</td>
+      <td class="td-bold">${fmt(totW/3517,2)}</td>
+    </tr>`;
+
+  // barra componentes
+  const comps = [
+    {label:'Envelope (paredes)', val:_res.reduce((s,r)=>s+r.qEnv,0), cls:''},
+    {label:'Solar (cobertura)',  val:_res.reduce((s,r)=>s+r.qSol,0), cls:'blue'},
+    {label:'Pessoas',            val:_res.reduce((s,r)=>s+r.qPess,0), cls:'warn'},
+    {label:'Iluminação',         val:_res.reduce((s,r)=>s+r.qIlum,0), cls:''},
+    {label:'Equipamentos',       val:_res.reduce((s,r)=>s+r.qEquip,0), cls:''},
+  ];
+  document.getElementById('barra-comp').innerHTML = comps.map(c=>`
+    <div class="bar-wrap">
+      <div class="bar-label"><span>${c.label}</span><span>${fmt(c.val,0)} W (${(c.val/totW*100).toFixed(1)}%)</span></div>
+      <div class="bar-track"><div class="bar-fill ${c.cls}" style="width:${(c.val/totW*100).toFixed(1)}%"></div></div>
+    </div>`).join('');
+
+  // equipamentos
+  let totCap=0;
+  const tipoCount={};
+  document.getElementById('equip-tbody').innerHTML = _res.map(r=>{
+    const btuMarg = r.btu*1.1;
+    const eq = equipSugerido(btuMarg);
+    totCap+=eq.cap;
+    tipoCount[eq.tipo]=(tipoCount[eq.tipo]||0)+1;
+    const ok = eq.cap>=btuMarg;
+    return `<tr>
+      <td>${r.nome}</td>
+      <td class="td-num">${fmt(r.btu,0)}</td>
+      <td class="td-num">${fmt(btuMarg,0)}</td>
+      <td>${eq.tipo}</td>
+      <td class="td-num">${fmt(eq.cap,0)}</td>
+      <td><span class="badge badge-blue">Evaporadora</span></td>
+      <td><span class="badge ${ok?'badge-ok':'badge-warn'}">${ok?'✓ OK':'Revisar'}</span></td>
+    </tr>`;
+  }).join('');
+  _totalCap=totCap;
+  document.getElementById('e-evap').textContent=COMODOS.length;
+  document.getElementById('e-cond').textContent=Math.ceil(COMODOS.length/2);
+  document.getElementById('e-cap').textContent=fmt(totCap,0);
+
+  // hero chart
+  const heroCtx=document.getElementById('heroChart');
+  if(heroChartInst) heroChartInst.destroy();
+  heroChartInst=new Chart(heroCtx,{
+    type:'bar',
+    data:{
+      labels:COMODOS.map(c=>c.nome.length>18?c.nome.substring(0,16)+'…':c.nome),
+      datasets:[{data:_res.map(r=>Math.round(r.btu)),backgroundColor:'rgba(0,212,168,0.7)',borderColor:'rgba(0,212,168,1)',borderWidth:1,borderRadius:4}]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>`${fmt(v.raw,0)} BTU/h`}}},
+      scales:{
+        x:{ticks:{color:'#7a8295',font:{family:"'DM Mono'",size:10},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#7a8295',font:{family:"'DM Mono'",size:10}},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+
+  // tipo chart
+  const tipoCtx=document.getElementById('tipoCanvas');
+  if(tipoChartInst) tipoChartInst.destroy();
+  const tipoLabels=Object.keys(tipoCount);
+  const tipoVals=tipoLabels.map(k=>tipoCount[k]);
+  tipoChartInst=new Chart(tipoCtx,{
+    type:'doughnut',
+    data:{labels:tipoLabels,datasets:[{data:tipoVals,backgroundColor:['rgba(0,212,168,0.8)','rgba(0,144,255,0.8)','rgba(245,166,35,0.8)','rgba(255,77,77,0.8)'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#7a8295',font:{family:"'DM Mono'",size:10},boxWidth:10,padding:12}}}}
+  });
+
+  calcCustos();
+  gerarMemoria();
+}
+
+function calcCustos(){
+  if(!_totalCap) return;
+  const cap=_totalCap;
+  const kEvap=gv('k_evap'), kCond=gv('k_cond'), pInst=gv('k_inst')/100, pMat=gv('k_mat')/100;
+  const cEvap=kEvap*cap*0.55, cCond=kCond*cap*0.45;
+  const cInst=(cEvap+cCond)*pInst, cMat=(cEvap+cCond)*pMat;
+  const capex=cEvap+cCond+cInst+cMat;
+  _capex=capex;
+
+  const eer=gv('k_eer'), horas=gv('k_horas')*gv('k_dias');
+  const potKW=(_totalW*1.1)/1000;
+  const kwh=potKW/(eer/3.412)*horas;
+  _kwh=kwh;
+  const energia=kwh*gv('k_tarifa');
+  const manut=capex*(gv('k_manut')/100);
+  const opex=energia+manut;
+  _opex=opex;
+  const anos=gv('k_anos');
+
+  document.getElementById('cu-capex').textContent=fmt(capex,0);
+  document.getElementById('cu-opex').textContent=fmt(opex,0);
+  document.getElementById('cu-kwh').textContent=fmt(kwh,0);
+  document.getElementById('cu-total').textContent=fmt(capex+opex*anos,0);
+  document.getElementById('hs-capex').innerHTML=fmt(capex,0);
+  document.getElementById('hs-opex').innerHTML=fmt(opex,0);
+
+  const row=(label,val,bold=false)=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;${bold?'font-weight:500':''}">
+      <span style="color:var(--muted)">${label}</span>
+      <span style="font-family:var(--mono);color:${bold?'var(--accent)':'var(--text)'}">R$ ${fmt(val,0)}</span>
+    </div>`;
+  document.getElementById('capex-break').innerHTML=
+    row(`Evaporadoras (${COMODOS.length} un.)`,cEvap)+
+    row(`Condensadoras (~${Math.ceil(COMODOS.length/2)} un.)`,cCond)+
+    row(`Instalação e M.O. (${gv('k_inst')}%)`,cInst)+
+    row(`Materiais e tubulação (${gv('k_mat')}%)`,cMat)+
+    row('CAPEX total',capex,true);
+  document.getElementById('opex-break').innerHTML=
+    row(`Energia (${fmt(kwh,0)} kWh/ano)`,energia)+
+    row(`Manutenção (${gv('k_manut')}% CAPEX)`,manut)+
+    row('OPEX anual total',opex,true);
+
+  // custo acumulado chart
+  const custoCtx=document.getElementById('custoChart');
+  if(custoChartInst) custoChartInst.destroy();
+  const labels=[...Array(anos+1).keys()];
+  const acum=labels.map(y=>Math.round(capex+opex*y));
+  custoChartInst=new Chart(custoCtx,{
+    type:'line',
+    data:{labels,datasets:[{label:'Custo acumulado (R$)',data:acum,borderColor:'rgba(0,212,168,0.9)',backgroundColor:'rgba(0,212,168,0.08)',fill:true,tension:0,pointRadius:3,pointBackgroundColor:'rgba(0,212,168,1)'}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>`R$ ${fmt(v.raw,0)}`}}},
+      scales:{
+        x:{title:{display:true,text:'Ano',color:'#7a8295',font:{family:"'DM Mono'",size:10}},ticks:{color:'#7a8295',font:{family:"'DM Mono'",size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#7a8295',font:{family:"'DM Mono'",size:10},callback:v=>'R$'+fmt(v,0)},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+
+  gerarMemoria();
+}
+
+function gerarMemoria(){
+  if(!_res.length) return;
+  const tExt=gv('p_text'),tInt=gv('p_tint');
+  const totArea=_res.reduce((s,r)=>s+r.area,0);
+  const totPess=_res.reduce((s,r)=>s+r.pessoas,0);
+  const totW=_totalW;
+
+  let html=`
+  <h4>1. DADOS DE PROJETO</h4>
+  <p>Edificação: pavimento único · Área climatizada: <span class="mval">${fmt(totArea,1)} m²</span> · Pé-direito: <span class="mval">2,5 m</span><br>
+  Tipo de forro: laje de concreto armado · Divisórias: alvenaria de bloco cerâmico<br>
+  Temperatura externa de projeto: <span class="mval">${tExt}°C</span> · Temperatura interna de conforto: <span class="mval">${tInt}°C</span> · ΔT = <span class="mval">${(tExt-tInt).toFixed(1)} K</span></p>
+
+  <h4>2. PARÂMETROS DE CÁLCULO</h4>
+  <p>
+  U parede (alvenaria cerâmica): <span class="mval">${gv('p_upar')} W/m²K</span><br>
+  U cobertura (laje concreto): <span class="mval">${gv('p_ucob')} W/m²K</span><br>
+  Irradiação solar: <span class="mval">${gv('p_solar')} W/m²</span> · Absortividade α: <span class="mval">0,80</span><br>
+  Calor sensível por pessoa (atividade sedentária): <span class="mval">${gv('p_pessoa')} W/pessoa</span><br>
+  Carga de iluminação: <span class="mval">${gv('p_ilum')} W/m²</span> · Carga de equipamentos: <span class="mval">${gv('p_equip')} W/m²</span><br>
+  Método: ASHRAE Simplified / NBR 16401 · Margem de segurança: <span class="mval">10%</span>
+  </p>
+
+  <h4>3. RESULTADOS POR CÔMODO</h4>
+  <div style="overflow-x:auto"><table class="row-table" style="font-size:12px;font-family:var(--mono)">
+    <thead><tr style="background:var(--surface2)">
+      <th>Cômodo</th><th>Área (m²)</th><th>Pessoas</th><th>Q_env (W)</th><th>Q_sol (W)</th><th>Q_pess (W)</th><th>Q_ilum (W)</th><th>Q_eq (W)</th><th>Q_tot (W)</th><th>BTU/h</th><th>TR</th>
+    </tr></thead>
+    <tbody>
+  ${_res.map(r=>`<tr>
+    <td>${r.nome}</td><td>${r.area}</td><td>${r.pessoas}</td>
+    <td>${fmt(r.qEnv,0)}</td><td>${fmt(r.qSol,0)}</td><td>${fmt(r.qPess,0)}</td>
+    <td>${fmt(r.qIlum,0)}</td><td>${fmt(r.qEquip,0)}</td>
+    <td style="color:var(--accent)">${fmt(r.qTot,0)}</td>
+    <td>${fmt(r.btu,0)}</td><td>${r.tr.toFixed(2)}</td>
+  </tr>`).join('')}
+    <tr style="background:rgba(0,212,168,0.07);font-weight:500">
+      <td>TOTAL</td><td>${fmt(totArea,1)}</td><td>${totPess}</td>
+      <td>${fmt(_res.reduce((s,r)=>s+r.qEnv,0),0)}</td>
+      <td>${fmt(_res.reduce((s,r)=>s+r.qSol,0),0)}</td>
+      <td>${fmt(_res.reduce((s,r)=>s+r.qPess,0),0)}</td>
+      <td>${fmt(_res.reduce((s,r)=>s+r.qIlum,0),0)}</td>
+      <td>${fmt(_res.reduce((s,r)=>s+r.qEquip,0),0)}</td>
+      <td style="color:var(--accent)">${fmt(totW,0)}</td>
+      <td style="color:var(--accent)">${fmt(totW*3.412,0)}</td>
+      <td style="color:var(--accent)">${(totW/3517).toFixed(2)}</td>
+    </tr>
+    </tbody>
+  </table></div>
+
+  <h4>4. EQUIPAMENTOS SELECIONADOS</h4>
+  <div style="overflow-x:auto"><table style="font-size:12px;font-family:var(--mono)">
+    <thead><tr style="background:var(--surface2)">
+      <th>Cômodo</th><th>Carga (BTU/h)</th><th>+10% (BTU/h)</th><th>Modelo sugerido</th><th>Cap. nominal (BTU/h)</th>
+    </tr></thead>
+    <tbody>
+  ${_res.map(r=>{const eq=equipSugerido(r.btu*1.1);return`<tr>
+    <td>${r.nome}</td><td>${fmt(r.btu,0)}</td><td>${fmt(r.btu*1.1,0)}</td>
+    <td>${eq.tipo}</td><td style="color:var(--accent)">${fmt(eq.cap,0)}</td>
+  </tr>`;}).join('')}
+    </tbody>
+  </table></div>
+  <p style="margin-top:8px">Total de evaporadoras: <span class="mval">${COMODOS.length}</span> · Condensadoras estimadas: <span class="mval">${Math.ceil(COMODOS.length/2)}</span> · Capacidade total instalada: <span class="mval">${fmt(_totalCap,0)} BTU/h</span></p>
+
+  <h4>5. ANÁLISE ECONÔMICA</h4>
+  <p>
+  CAPEX total estimado: <span class="mval">R$ ${fmt(_capex,0)}</span><br>
+  OPEX anual estimado: <span class="mval">R$ ${fmt(_opex,0)}</span><br>
+  Consumo anual estimado: <span class="mval">${fmt(_kwh,0)} kWh/ano</span><br>
+  Custo total (${gv('k_anos')} anos): <span class="mval">R$ ${fmt(_capex+_opex*gv('k_anos'),0)}</span><br>
+  EER adotado: <span class="mval">${gv('k_eer')} BTU/Wh</span> · Tarifa: <span class="mval">R$ ${gv('k_tarifa')}/kWh</span>
+  </p>
+
+  <h4>6. CONCEITO DO SISTEMA</h4>
+  <p>Sistema split multi-split individualizado com refrigerante R-32 (GWP 675, menor impacto ambiental). Cada unidade condensadora atende 1 a 2 evaporadoras de cômodos adjacentes. Evaporadoras do tipo hi-wall para cômodos menores e cassete/piso-teto para cômodos de alta carga. Tubulações em cobre com isolamento térmico e drenagem por gravidade. Temperatura de conforto controlável entre 19°C e 26°C conforme NBR 16401.</p>
+  `;
+  document.getElementById('memoria-out').innerHTML=html;
+}
+
+function showSection(id, btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function exportMemoria(){
+  const el=document.getElementById('memoria-out');
+  const text=el.innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn=event.target;
+    btn.textContent='Copiado ✓';
+    setTimeout(()=>btn.textContent='Copiar memória',2000);
+  });
+}
+
+calcAll();
+</script>
+</body>
+</html>
